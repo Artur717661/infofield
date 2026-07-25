@@ -1,0 +1,8 @@
+.zed/
+__pycache__/
+**/__pycache__/
+venv/
+frontend/node_modules/
+.env
+**/.env
+frontend/dist/
