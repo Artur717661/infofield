@@ -35,27 +35,32 @@ export type Post = {
   reposts: number;
   views: number;
   engagement: number;
+  isAdmissions: boolean;
 };
 
 export type FiltersState = {
   dateFrom: string;
   dateTo: string;
-  audience: string;
-  sentiment: string;
-  unit: string;
-  direction: string;
-  event: string;
-  source: string;
+  sources: PostSource[];
+  audiences: string[];
+  sentiments: string[];
   query: string;
-};
-
-export type SummaryMetric = {
-  label: string;
-  value: number;
-  hint: string;
+  admissionsOnly: boolean;
 };
 
 export type ChartDatum = {
   label: string;
   value: number;
 };
+
+export type Selection =
+  | { kind: "day"; value: string; label: string }
+  | { kind: "sentiment"; value: string; label: string }
+  | { kind: "unit"; value: string; label: string }
+  | { kind: "person"; value: string; label: string }
+  | { kind: "event"; value: string; label: string }
+  | { kind: "direction"; value: string; label: string }
+  | { kind: "ngram"; value: string; label: string }
+  | { kind: "source"; value: string; label: string }
+  | { kind: "admissions"; value: string; label: string }
+  | null;

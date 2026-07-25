@@ -1,109 +1,66 @@
-# InfoField Frontend MVP
+# InfoField Frontend
 
-Frontend for the InfoField analytics dashboard. It works with the existing backend as-is and reads data only from these two FastAPI endpoints:
+Analytics dashboard for university media monitoring (Telegram / VK / Max). Reads
+only from the existing FastAPI backend, unmodified:
 
 - `GET /telegram`
 - `GET /vk`
 
-The frontend does not require backend code changes. During local development it uses the Vite dev proxy, so requests from the browser go through the frontend dev server and are forwarded to `http://localhost:8000`.
-
 ## Stack
 
-- React
-- Vite
-- TypeScript
-- Recharts
-- Fetch API
+- React 19 + TypeScript + Vite
+- Recharts (sentiment donut) + hand-rolled SVG for the rest of the charts
+  (anomaly line, calendar heatmap, treemap, bump chart, collocation graph,
+  funnel, n-gram bars) so every visual can carry its own click-to-drill-down
+  behaviour without fighting a charting library's event model
+- Framer Motion for tab transitions and the drill-down panel
 
-## Install
+## Install & run
 
 ```bash
 npm install
-```
-
-If PowerShell blocks `npm`, use:
-
-```bash
-npm.cmd install
-```
-
-## Environment
-
-By default no custom frontend `.env` is required.
-
-The project already works with:
-
-- frontend on `http://127.0.0.1:4174`
-- backend on `http://localhost:8000`
-
-If you want to override the API base URL, create `.env` from `.env.example` and set:
-
-```env
-VITE_API_BASE_URL=http://localhost:8000
-```
-
-When `VITE_API_BASE_URL` is empty, the frontend uses relative paths `/telegram` and `/vk`, which are proxied by Vite in dev mode.
-
-## Run backend
-
-Backend is located рядом in `../backend`.
-
-Minimal start:
-
-```bash
-python main.py
-```
-
-or
-
-```bash
-uvicorn main:app --reload
-```
-
-Backend port is not explicitly set in source, so the default is `8000`.
-
-## Run frontend
-
-```bash
 npm run dev
 ```
 
-or
+Opens on `http://127.0.0.1:4174`. In dev, `/telegram` and `/vk` are proxied by
+Vite to `http://localhost:8000` (see `vite.config.mjs`) — no `.env` required.
+To point at a different backend, set `VITE_API_BASE_URL`.
 
-```bash
-npm.cmd run dev
-```
+## What's implemented
 
-Open:
+- Global filter bar: date range, source (TG/VK), audience, sentiment, free
+  text search, and a dedicated "ИТ-специалитет" toggle
+- KPI row: mention volume with period-over-period delta, engagement rate,
+  reach (views), loyalty index `(pos − neg) / total × 100`, anomaly day count
+  (`|z| ≥ 2` on the daily mention series)
+- Обзор: anomaly line chart, sentiment donut, activity calendar heatmap, topic
+  tag cloud — every chart element is clickable and opens a drill-down panel
+  with the underlying posts
+- Сущности: department treemap, monthly person-rank (bump) chart, persona ↔
+  event collocation graph
+- Тренды: анонс → пост-релиз funnel, monthly volume split
+- Контент: bigram comparison (students vs employees lexicon), top directions
+- ИТ-специалитет: a dedicated view tracking how the specialty's admissions
+  campaign performs in the info field — share of voice, engagement vs the
+  overall stream, sentiment, and the same funnel
 
-- `http://127.0.0.1:4174`
+## Data note
 
-## Typecheck and build
+The backend's `post_date` column only stores a date, not a timestamp, so an
+hour-of-day heatmap isn't derivable from real data — the "Активность по дням"
+view uses a day-level calendar heatmap instead of a fabricated 24×7 grid.
+"Reach" is the sum of measured `views`, not subscriber counts (the API doesn't
+expose channel audience size).
 
-```bash
-npm run typecheck
-npm run build
-```
+## Security
 
-## What is implemented
-
-- dashboard header
-- theme toggle
-- metric cards
-- client-side filters
-- charts by dates, audiences, sentiment, directions, units, events, engagement
-- posts table
-- loading state
-- error state
-- empty state
-- safe handling of missing fields
-
-## Important backend limitation
-
-The original backend stores `text` in the database but does not return `text` from `/telegram` and `/vk`.
-
-Because of that, the frontend:
-
-- safely shows a fallback message instead of post text when `text` is missing
-- keeps analytics and filters working from the available fields
-- automatically starts showing real post text if the backend later begins returning it
+- `Content-Security-Policy` and `Referrer-Policy` set via `<meta>` in
+  `index.html` (`script-src 'self'`, no `unsafe-eval`)
+- Post text from Telegram/VK is untrusted input: it is only ever rendered as
+  a React text child, never through `dangerouslySetInnerHTML`
+- `fetch()` calls use `credentials: "omit"` — the API is same-origin (via the
+  dev proxy) and never receives cookies
+- If you deploy the built frontend behind a static host / reverse proxy, also
+  set the response headers a `<meta>` tag cannot express:
+  `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, HSTS, and a
+  CORS allowlist on the backend limited to the frontend's real origin

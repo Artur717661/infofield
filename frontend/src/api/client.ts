@@ -7,6 +7,12 @@ const ENDPOINTS = {
   vk: `${API_BASE_URL}/vk`,
 } as const;
 
+// Deliberately narrow to the IT specialty itself, not general admissions
+// terms ("день открытых дверей", "приёмная комиссия") that other faculties
+// and departments use too — otherwise the admissions share-of-voice inflates
+// with unrelated programs and stops answering "how visible is IT-специалитет".
+const ADMISSIONS_MARKERS = ["ит-специалитет"];
+
 function toNumber(value: string | number | null | undefined): number {
   if (typeof value === "number") {
     return Number.isFinite(value) ? value : 0;
@@ -39,6 +45,11 @@ function resolveSource(value: string | undefined): PostSource {
   return "unknown";
 }
 
+function detectAdmissions(text: string, units: string[], events: string[]): boolean {
+  const haystack = [text, ...units, ...events].join(" ").toLowerCase();
+  return ADMISSIONS_MARKERS.some((marker) => haystack.includes(marker));
+}
+
 function normalizePost(raw: ApiPost, index: number): Post {
   const source = resolveSource(raw.src);
   const date = raw.date ?? "";
@@ -50,6 +61,8 @@ function normalizePost(raw: ApiPost, index: number): Post {
   const comments = Math.max(0, Math.trunc(raw.comments ?? 0));
   const reposts = Math.max(0, Math.trunc(raw.reposts ?? 0));
   const views = Math.max(0, Math.trunc(toNumber(raw.views)));
+  const units = sanitizeStringArray(raw.units);
+  const events = sanitizeStringArray(raw.events);
 
   return {
     id: `${source}-${String(raw.id ?? index)}`,
@@ -61,14 +74,15 @@ function normalizePost(raw: ApiPost, index: number): Post {
     aud: sanitizeStringArray(raw.aud),
     sent: raw.sent?.trim() || "unknown",
     persons: sanitizeStringArray(raw.persons),
-    units: sanitizeStringArray(raw.units),
-    events: sanitizeStringArray(raw.events),
+    units,
+    events,
     directions: sanitizeStringArray(raw.directions),
     likes,
     comments,
     reposts,
     views,
     engagement: likes + comments + reposts,
+    isAdmissions: detectAdmissions(text, units, events),
   };
 }
 
@@ -77,6 +91,9 @@ async function fetchEndpoint(url: string): Promise<ApiPost[]> {
     headers: {
       Accept: "application/json",
     },
+    // Same-origin API by design: never forward cookies/credentials cross-origin.
+    credentials: "omit",
+    referrerPolicy: "no-referrer",
   });
 
   if (!response.ok) {
