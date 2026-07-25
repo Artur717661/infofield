@@ -11,24 +11,30 @@ const TABS: { id: TabId; label: string }[] = [
 type NavBarProps = {
   active: TabId;
   onChange: (tab: TabId) => void;
-  isLive: boolean;
+  periodLabel: string | null;
+  refreshing: boolean;
+  onRefresh: () => void;
 };
 
-export function NavBar({ active, onChange, isLive }: NavBarProps) {
+export function NavBar({ active, onChange, periodLabel, refreshing, onRefresh }: NavBarProps) {
   return (
     <nav className="nav">
       <div className="nav-inner">
         <div className="brand">
           <span className="dot" />
           <b>INFOFIELD</b>
-          <span>/ аналитика университета</span>
+          <span>/ информационное поле университета</span>
         </div>
 
-        <div className="tabs">
+        <div className="tabs" role="tablist" aria-label="Экраны дашборда">
           {TABS.map((tab) => (
             <button
               key={tab.id}
               type="button"
+              role="tab"
+              id={`tab-${tab.id}`}
+              aria-selected={active === tab.id}
+              aria-controls={`panel-${tab.id}`}
               className={`tab-button${active === tab.id ? " active" : ""}`}
               onClick={() => onChange(tab.id)}
             >
@@ -37,9 +43,23 @@ export function NavBar({ active, onChange, isLive }: NavBarProps) {
           ))}
         </div>
 
-        <div className={`nav-status${isLive ? "" : " offline"}`}>
-          <span className="blip" />
-          {isLive ? "ЯНВ – ИЮЛ 2026" : "НЕТ ДАННЫХ"}
+        <div className="nav-right">
+          {periodLabel ? (
+            <span className="nav-status">
+              <span className="blip" />
+              {periodLabel}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            className={`refresh-button${refreshing ? " spinning" : ""}`}
+            onClick={onRefresh}
+            disabled={refreshing}
+            aria-label="Обновить данные"
+            title="Обновить данные"
+          >
+            ↻
+          </button>
         </div>
       </div>
     </nav>

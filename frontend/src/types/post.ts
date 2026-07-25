@@ -55,6 +55,9 @@ export type ChartDatum = {
 
 export type Selection =
   | { kind: "day"; value: string; label: string }
+  | { kind: "days"; value: string[]; label: string }
+  /** Exact set of post ids — used where a date range would be too coarse. */
+  | { kind: "posts"; value: string[]; label: string }
   | { kind: "sentiment"; value: string; label: string }
   | { kind: "unit"; value: string; label: string }
   | { kind: "person"; value: string; label: string }

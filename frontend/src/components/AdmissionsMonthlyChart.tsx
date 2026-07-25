@@ -1,48 +1,61 @@
+import { useState } from "react";
+import { MonthlyBucket } from "../lib/admissions";
+
 type AdmissionsMonthlyChartProps = {
-  monthly: { month: string; admissions: number; total: number }[];
-  onSelectMonth?: (month: string) => void;
+  monthly: MonthlyBucket[];
+  onSelectMonth?: (month: MonthlyBucket) => void;
 };
 
 export function AdmissionsMonthlyChart({ monthly, onSelectMonth }: AdmissionsMonthlyChartProps) {
+  const [hover, setHover] = useState<string | null>(null);
+
   if (monthly.length === 0) {
-    return <div style={{ color: "var(--text-faint)", fontSize: 13 }}>Нет данных.</div>;
+    return <div className="panel-empty">Нет данных за период.</div>;
   }
+
   const max = Math.max(...monthly.map((m) => m.total), 1);
+  const active = hover ? monthly.find((m) => m.key === hover) : null;
 
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 150 }}>
-      {monthly.map((m) => (
-        <div
-          key={m.month}
-          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, cursor: onSelectMonth ? "pointer" : "default" }}
-          onClick={() => onSelectMonth?.(m.month)}
-        >
-          <div style={{ position: "relative", width: "100%", height: 110, display: "flex", alignItems: "flex-end" }}>
-            <div
-              style={{
-                width: "100%",
-                height: `${(m.total / max) * 100}%`,
-                background: "var(--grid-line-soft)",
-                borderRadius: 4,
-                position: "relative",
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: 0,
-                  width: "100%",
-                  height: `${m.total > 0 ? (m.admissions / m.total) * 100 : 0}%`,
-                  background: "var(--accent)",
-                  borderRadius: "0 0 4px 4px",
-                }}
+    <div className="monthly-chart">
+      <div className="monthly-readout">
+        {active ? (
+          <>
+            <b>{active.label}</b>
+            <span>
+              {active.admissions} из {active.total} — ИТ-специалитет
+              {active.total > 0 ? ` (${Math.round((active.admissions / active.total) * 100)}%)` : ""}
+            </span>
+          </>
+        ) : (
+          <span className="monthly-legend">
+            <i className="swatch admissions" /> ИТ-специалитет
+            <i className="swatch total" /> остальной поток
+          </span>
+        )}
+      </div>
+
+      <div className="monthly-bars">
+        {monthly.map((m) => (
+          <button
+            key={m.key}
+            type="button"
+            className="monthly-bar"
+            onMouseEnter={() => setHover(m.key)}
+            onMouseLeave={() => setHover(null)}
+            onClick={() => onSelectMonth?.(m)}
+            aria-label={`${m.label}: ${m.admissions} из ${m.total}`}
+          >
+            <span className="monthly-col" style={{ height: `${(m.total / max) * 100}%` }}>
+              <span
+                className="monthly-col-admissions"
+                style={{ height: `${m.total > 0 ? (m.admissions / m.total) * 100 : 0}%` }}
               />
-            </div>
-          </div>
-          <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--text-faint)" }}>{m.month}</span>
-        </div>
-      ))}
+            </span>
+            <span className="monthly-label">{m.label}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

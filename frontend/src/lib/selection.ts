@@ -6,6 +6,14 @@ export function postsForSelection(posts: Post[], selection: Selection): Post[] {
   switch (selection.kind) {
     case "day":
       return posts.filter((p) => p.date === selection.value);
+    case "days": {
+      const days = new Set(selection.value);
+      return posts.filter((p) => days.has(p.date));
+    }
+    case "posts": {
+      const ids = new Set(selection.value);
+      return posts.filter((p) => ids.has(p.id));
+    }
     case "sentiment":
       return posts.filter((p) => p.sent === selection.value);
     case "unit":
@@ -25,4 +33,12 @@ export function postsForSelection(posts: Post[], selection: Selection): Post[] {
     default:
       return [];
   }
+}
+
+export function sameSelection(a: Selection, b: Selection): boolean {
+  if (!a || !b || a.kind !== b.kind) return false;
+  if (Array.isArray(a.value) || Array.isArray(b.value)) {
+    return JSON.stringify(a.value) === JSON.stringify(b.value);
+  }
+  return a.value === b.value;
 }

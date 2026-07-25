@@ -79,7 +79,7 @@ export function sentimentBreakdown(posts: Post[]) {
   };
 }
 
-export function computeKpis(posts: Post[], previousPosts: Post[]): Kpis {
+export function computeKpis(posts: Post[], previousPosts: Post[], series: DailyPoint[]): Kpis {
   const total = posts.length;
   const engagementSum = posts.reduce((s, p) => s + p.engagement, 0);
   const reach = posts.reduce((s, p) => s + p.views, 0);
@@ -88,16 +88,29 @@ export function computeKpis(posts: Post[], previousPosts: Post[]): Kpis {
   const prevTotal = previousPosts.length;
   const deltaPct = prevTotal > 0 ? Math.round(((total - prevTotal) / prevTotal) * 100) : null;
 
-  const anomalyDays = dailySeries(posts).filter((d) => d.isAnomaly).length;
-
   return {
     totalMentions: total,
     deltaPct,
     engagementRate: total > 0 ? Number((engagementSum / total).toFixed(1)) : 0,
     reach,
     loyaltyIndex: total > 0 ? Math.round(((pos - neg) / total) * 100) : 0,
-    anomalyDays,
+    anomalyDays: series.filter((d) => d.isAnomaly).length,
   };
+}
+
+/** Weekly totals, for the KPI sparkline — daily counts are too noisy to read at 92px. */
+export function weeklyTotals(series: DailyPoint[], buckets = 14): number[] {
+  if (series.length === 0) return [];
+  const size = Math.max(1, Math.ceil(series.length / buckets));
+  const out: number[] = [];
+  for (let i = 0; i < series.length; i += size) {
+    out.push(series.slice(i, i + size).reduce((s, d) => s + d.count, 0));
+  }
+  return out;
+}
+
+export function anomalyDates(series: DailyPoint[]): string[] {
+  return series.filter((d) => d.isAnomaly).map((d) => d.date);
 }
 
 export function shiftRangeBack(dateFrom: string, dateTo: string): [string, string] {

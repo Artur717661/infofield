@@ -1,4 +1,4 @@
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { useState } from "react";
 
 type SentimentDonutProps = {
   pos: number;
@@ -9,76 +9,96 @@ type SentimentDonutProps = {
 };
 
 const COLORS: Record<string, string> = {
-  pos: "#4ade80",
-  neu: "#8b85a6",
-  neg: "#ff5468",
+  pos: "var(--pos)",
+  neu: "var(--neu)",
+  neg: "var(--neg)",
 };
 const LABELS: Record<string, string> = { pos: "Позитив", neu: "Нейтрально", neg: "Негатив" };
 
+const SIZE = 132;
+const CENTER = SIZE / 2;
+const RADIUS = 48;
+const STROKE = 17;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+const GAP = 2.5; // degrees of breathing room between arcs
+
 export function SentimentDonut({ pos, neu, neg, selected, onSelect }: SentimentDonutProps) {
-  const total = pos + neu + neg || 1;
+  const [hover, setHover] = useState<string | null>(null);
+  const total = pos + neu + neg;
   const data = [
     { id: "pos", value: pos },
     { id: "neu", value: neu },
     { id: "neg", value: neg },
-  ];
+  ].filter((d) => d.value > 0);
+
+  if (total === 0) {
+    return <div className="panel-empty">Нет публикаций в этом срезе.</div>;
+  }
+
+  const active = hover ?? selected ?? null;
+  const activeEntry = active ? data.find((d) => d.id === active) : null;
+
+  let offsetDeg = -90;
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-      <div style={{ width: 130, height: 130, flexShrink: 0 }}>
-        <ResponsiveContainer>
-          <PieChart>
-            <Pie
-              data={data}
-              dataKey="value"
-              nameKey="id"
-              innerRadius={38}
-              outerRadius={60}
-              paddingAngle={2}
-              stroke="none"
-              animationDuration={600}
-            >
-              {data.map((entry) => (
-                <Cell
-                  key={entry.id}
-                  fill={COLORS[entry.id]}
-                  opacity={selected && selected !== entry.id ? 0.35 : 1}
-                  style={{ cursor: "pointer" }}
-                  onClick={() => onSelect(entry.id)}
-                />
-              ))}
-            </Pie>
-            <Tooltip
-              formatter={(value: number, _name, item) => [`${value} (${Math.round((value / total) * 100)}%)`, LABELS[item.payload.id]]}
-              contentStyle={{ background: "var(--bg-elevated)", border: "1px solid var(--grid-line)", borderRadius: 8, fontSize: 12 }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
+    <div className="donut-row">
+      <div className="donut-figure">
+        <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width={SIZE} height={SIZE} role="img" aria-label="Распределение тональности">
+          {data.map((entry) => {
+            const share = entry.value / total;
+            const sweep = share * 360;
+            const dash = (Math.max(sweep - GAP, 0.6) / 360) * CIRCUMFERENCE;
+            const rotation = offsetDeg;
+            offsetDeg += sweep;
+            const dim = active !== null && active !== entry.id;
+
+            return (
+              <circle
+                key={entry.id}
+                className="donut-arc"
+                cx={CENTER}
+                cy={CENTER}
+                r={RADIUS}
+                fill="none"
+                stroke={COLORS[entry.id]}
+                strokeWidth={active === entry.id ? STROKE + 4 : STROKE}
+                strokeDasharray={`${dash} ${CIRCUMFERENCE}`}
+                strokeLinecap="butt"
+                opacity={dim ? 0.3 : 1}
+                transform={`rotate(${rotation} ${CENTER} ${CENTER})`}
+                onMouseEnter={() => setHover(entry.id)}
+                onMouseLeave={() => setHover(null)}
+                onClick={() => onSelect(entry.id)}
+              />
+            );
+          })}
+          <text x={CENTER} y={CENTER - 2} textAnchor="middle" className="donut-center-value">
+            {activeEntry ? `${Math.round((activeEntry.value / total) * 100)}%` : total}
+          </text>
+          <text x={CENTER} y={CENTER + 14} textAnchor="middle" className="donut-center-label">
+            {activeEntry ? LABELS[activeEntry.id] : "публикаций"}
+          </text>
+        </svg>
       </div>
-      <div style={{ display: "grid", gap: 8 }}>
-        {data.map((entry) => (
-          <button
-            key={entry.id}
-            onClick={() => onSelect(entry.id)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: selected === entry.id ? "var(--text)" : "var(--text-dim)",
-              fontSize: 13,
-              padding: 0,
-            }}
-          >
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS[entry.id] }} />
-            {LABELS[entry.id]}
-            <span style={{ fontFamily: "var(--mono)", color: "var(--text-faint)" }}>
-              {Math.round((entry.value / total) * 100)}%
-            </span>
-          </button>
-        ))}
+
+      <div className="donut-legend">
+        {(["pos", "neu", "neg"] as const).map((id) => {
+          const value = id === "pos" ? pos : id === "neu" ? neu : neg;
+          return (
+            <button
+              key={id}
+              type="button"
+              className={`legend-item${selected === id ? " active" : ""}`}
+              onMouseEnter={() => setHover(id)}
+              onMouseLeave={() => setHover(null)}
+              onClick={() => onSelect(id)}
+            >
+              <span className="legend-dot" style={{ background: COLORS[id] }} />
+              <span className="legend-label">{LABELS[id]}</span>
+              <span className="legend-value">{Math.round((value / total) * 100)}%</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
