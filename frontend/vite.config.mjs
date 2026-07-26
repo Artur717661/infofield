@@ -7,12 +7,10 @@ export default defineConfig({
     host: "127.0.0.1",
     port: 4174,
     proxy: {
-      "/telegram": {
-        target: "http://localhost:8000",
-        changeOrigin: true,
-      },
-      "/vk": {
-        target: "http://localhost:8000",
+      // Дашборд обращается только к шлюзу авторизации (порт 8080).
+      // Backend (8000) намеренно недоступен напрямую — так же, как в проде.
+      "/api": {
+        target: "http://127.0.0.1:8080",
         changeOrigin: true,
       },
     },

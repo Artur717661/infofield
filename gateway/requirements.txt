@@ -1,0 +1,5 @@
+# Зависимости шлюза авторизации. Устанавливаются в тот же venv, что и backend.
+# fastapi, uvicorn, sqlalchemy, psycopg2, httpx и python-dotenv уже есть
+# в backend/requirements.txt — здесь только то, чего там нет.
+argon2-cffi==25.1.0
+uvicorn[standard]==0.40.0

@@ -1,0 +1,42 @@
+[Unit]
+Description=InfoField backend (FastAPI, парсеры TG/VK + NLP)
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=infofield
+Group=infofield
+WorkingDirectory=/opt/infofield
+EnvironmentFile=/opt/infofield/backend/.env
+Environment="PLAYWRIGHT_BROWSERS_PATH=/opt/infofield/.playwright"
+Environment="PYTHONUNBUFFERED=1"
+
+# Слушает ТОЛЬКО localhost: из интернета backend недоступен, весь трафик
+# идёт через шлюз авторизации.
+ExecStart=/opt/infofield/venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000
+
+Restart=always
+RestartSec=5
+
+# --- изоляция процесса ---
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# Chromium от Playwright нужен на запись при запуске.
+ReadWritePaths=/opt/infofield/.playwright
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=infofield-backend
+
+[Install]
+WantedBy=multi-user.target

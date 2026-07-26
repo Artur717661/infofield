@@ -137,7 +137,10 @@ code {
   font-family: var(--mono);
   font-size: 13.5px;
   white-space: nowrap;
-  flex-shrink: 0;
+  /* Может сжиматься: с шестой вкладкой (админской) в шапке иначе не хватает
+     места и подпись бренда наезжает на меню. */
+  min-width: 0;
+  overflow: hidden;
 }
 .brand .dot {
   width: 8px;
@@ -161,6 +164,8 @@ code {
   gap: 2px;
   overflow-x: auto;
   scrollbar-width: none;
+  min-width: 0;
+  flex-shrink: 0;
 }
 .tabs::-webkit-scrollbar {
   display: none;
@@ -1254,7 +1259,9 @@ code {
 }
 
 /* ============ responsive ============ */
-@media (min-width: 760px) {
+/* Подпись бренда появляется только когда в шапке реально есть свободное
+   место: шесть вкладок + период + пользователь занимают почти всю ширину. */
+@media (min-width: 1560px) {
   .brand > span:last-child {
     display: inline;
   }
@@ -1285,6 +1292,19 @@ code {
 }
 
 @media (max-width: 680px) {
+  /* Период уже виден в полях даты фильтра, поэтому в шапке его убираем —
+     иначе логин и кнопка выхода уезжают за край экрана. */
+  .nav-status {
+    display: none;
+  }
+  .nav-right {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    min-width: 0;
+  }
+  .user-name {
+    max-width: 92px;
+  }
   .kpi-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1326,4 +1346,263 @@ code {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
+}
+
+/* ============ экран входа ============ */
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Тот же радар, что в загрузчике — узнаваемый знак продукта, но крупнее и тише. */
+.login-radar {
+  position: absolute;
+  width: min(760px, 130vw);
+  aspect-ratio: 1;
+  pointer-events: none;
+}
+.login-radar span {
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  opacity: 0;
+  animation: radar 6s ease-out infinite;
+}
+.login-radar span:nth-child(2) { animation-delay: 2s; }
+.login-radar span:nth-child(3) { animation-delay: 4s; }
+
+.login-card {
+  position: relative;
+  z-index: 1;
+  width: min(400px, 100%);
+  background: var(--bg-panel);
+  border: 1px solid var(--grid-line);
+  border-radius: var(--radius-lg);
+  padding: 30px 28px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.45);
+}
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+}
+.login-card h1 {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 25px;
+  line-height: 1.22;
+  letter-spacing: -0.01em;
+}
+.login-sub {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.login-field > span {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.login-field input,
+.login-field select {
+  background: var(--bg-input);
+  border: 1px solid var(--grid-line);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-size: 14px;
+}
+.login-field input:focus,
+.login-field select:focus {
+  border-color: var(--accent-2);
+}
+.login-field input:disabled,
+.login-field select:disabled {
+  opacity: 0.6;
+}
+.login-error {
+  background: rgba(255, 84, 104, 0.12);
+  border: 1px solid rgba(255, 84, 104, 0.35);
+  color: var(--neg);
+  border-radius: var(--radius-md);
+  padding: 9px 12px;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.login-submit {
+  margin-top: 2px;
+  padding: 11px 18px;
+}
+.login-note {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-faint);
+}
+
+/* ============ модальное окно ============ */
+.modal-card {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 62;
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--grid-line);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5);
+}
+.modal-card h3 {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 21px;
+}
+.modal-note {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-faint);
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 4px;
+}
+
+/* ============ пользователь в шапке ============ */
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--bg-panel);
+  border: 1px solid var(--grid-line);
+  border-radius: var(--radius-pill);
+  padding: 5px 11px;
+  cursor: pointer;
+  color: var(--text-dim);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.user-chip:hover {
+  color: var(--text);
+  border-color: var(--text-faint);
+}
+.user-name {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.role-tag {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 4px;
+  padding: 2px 5px;
+}
+
+/* ============ админка ============ */
+.admin-notice {
+  background: var(--accent-2-soft);
+  border: 1px solid rgba(86, 232, 208, 0.32);
+  color: var(--accent-2);
+  border-radius: var(--radius-md);
+  padding: 9px 12px;
+  font-size: 12.5px;
+}
+.table-scroll {
+  overflow-x: auto;
+}
+.audit-scroll {
+  max-height: 340px;
+  overflow-y: auto;
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  min-width: 520px;
+}
+.admin-table th {
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  font-weight: 400;
+  padding: 0 10px 8px 0;
+  border-bottom: 1px solid var(--grid-line);
+  position: sticky;
+  top: 0;
+  background: var(--bg-panel);
+}
+.admin-table td {
+  padding: 9px 10px 9px 0;
+  border-bottom: 1px solid var(--grid-line-soft);
+  color: var(--text-dim);
+  vertical-align: middle;
+}
+.admin-table tr.inactive td {
+  opacity: 0.5;
+}
+.admin-table td.num {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+.admin-table td.danger {
+  color: var(--neg);
+}
+.you-tag {
+  margin-left: 7px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  color: var(--accent-2);
+  border: 1px solid rgba(86, 232, 208, 0.3);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
 }

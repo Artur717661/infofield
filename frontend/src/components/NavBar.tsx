@@ -1,6 +1,8 @@
-export type TabId = "overview" | "entities" | "trends" | "content" | "admissions";
+import { CurrentUser } from "../api/auth";
 
-const TABS: { id: TabId; label: string }[] = [
+export type TabId = "overview" | "entities" | "trends" | "content" | "admissions" | "admin";
+
+const BASE_TABS: { id: TabId; label: string }[] = [
   { id: "overview", label: "Обзор" },
   { id: "entities", label: "Сущности" },
   { id: "trends", label: "Тренды" },
@@ -14,9 +16,15 @@ type NavBarProps = {
   periodLabel: string | null;
   refreshing: boolean;
   onRefresh: () => void;
+  user: CurrentUser | null;
+  onLogout: () => void;
+  onChangePassword: () => void;
 };
 
-export function NavBar({ active, onChange, periodLabel, refreshing, onRefresh }: NavBarProps) {
+export function NavBar(props: NavBarProps) {
+  const { active, onChange, periodLabel, refreshing, onRefresh, user, onLogout, onChangePassword } = props;
+  const tabs = user?.role === "admin" ? [...BASE_TABS, { id: "admin" as TabId, label: "Доступ" }] : BASE_TABS;
+
   return (
     <nav className="nav">
       <div className="nav-inner">
@@ -27,7 +35,7 @@ export function NavBar({ active, onChange, periodLabel, refreshing, onRefresh }:
         </div>
 
         <div className="tabs" role="tablist" aria-label="Экраны дашборда">
-          {TABS.map((tab) => (
+          {tabs.map((tab) => (
             <button
               key={tab.id}
               type="button"
@@ -50,6 +58,7 @@ export function NavBar({ active, onChange, periodLabel, refreshing, onRefresh }:
               {periodLabel}
             </span>
           ) : null}
+
           <button
             type="button"
             className={`refresh-button${refreshing ? " spinning" : ""}`}
@@ -60,6 +69,18 @@ export function NavBar({ active, onChange, periodLabel, refreshing, onRefresh }:
           >
             ↻
           </button>
+
+          {user ? (
+            <div className="user-menu">
+              <button type="button" className="user-chip" onClick={onChangePassword} title="Сменить пароль">
+                <span className="user-name">{user.username}</span>
+                {user.role === "admin" ? <span className="role-tag">админ</span> : null}
+              </button>
+              <button type="button" className="reset-button" onClick={onLogout}>
+                выйти
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
     </nav>

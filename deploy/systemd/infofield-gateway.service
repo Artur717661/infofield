@@ -1,0 +1,42 @@
+[Unit]
+Description=InfoField gateway (авторизация, сессии, кэш перед backend)
+After=network-online.target postgresql.service infofield-backend.service
+Wants=network-online.target infofield-backend.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=infofield
+Group=infofield
+WorkingDirectory=/opt/infofield
+# Общий .env с backend (DATABASE_URL) плюс свои настройки шлюза.
+EnvironmentFile=/opt/infofield/backend/.env
+EnvironmentFile=/opt/infofield/gateway/.env
+Environment="PYTHONUNBUFFERED=1"
+
+# Тоже только localhost: наружу его публикует nginx.
+ExecStart=/opt/infofield/venv/bin/uvicorn gateway.main:app --host 127.0.0.1 --port 8080 --proxy-headers --forwarded-allow-ips=127.0.0.1
+
+Restart=always
+RestartSec=5
+
+# --- изоляция процесса ---
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+# Шлюз только читает файлы фронтенда и пишет в базу — записи на диск не нужны.
+ReadOnlyPaths=/opt/infofield
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=infofield-gateway
+
+[Install]
+WantedBy=multi-user.target

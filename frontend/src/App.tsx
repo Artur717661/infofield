@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { fetchPosts } from "./api/client";
+import { UnauthorizedError, fetchPosts } from "./api/client";
+import { CurrentUser, fetchCurrentUser, logout as logoutRequest, refreshData } from "./api/auth";
 import { FiltersState, Post, Selection } from "./types/post";
 import {
   DateBounds,
@@ -41,8 +42,12 @@ import { DrillDownPanel } from "./components/DrillDownPanel";
 import { LoadingState, ErrorState, EmptyState } from "./components/StateViews";
 import { SecurityNote } from "./components/SecurityNote";
 import { Panel } from "./components/Panel";
+import { LoginScreen } from "./components/LoginScreen";
+import { AdminPanel } from "./components/AdminPanel";
+import { ChangePasswordDialog } from "./components/ChangePasswordDialog";
 
 type LoadState = "loading" | "success" | "error";
+type AuthState = "checking" | "anonymous" | "authenticated";
 
 const MONTHS_SHORT = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
 
@@ -64,34 +69,95 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [selection, setSelection] = useState<Selection>(null);
 
-  const load = useCallback(async (isRefresh = false) => {
-    try {
-      if (isRefresh) setRefreshing(true);
-      else setLoadState("loading");
-      setError("");
+  const [authState, setAuthState] = useState<AuthState>("checking");
+  const [user, setUser] = useState<CurrentUser | null>(null);
+  const [passwordDialog, setPasswordDialog] = useState(false);
 
-      const data = await fetchPosts();
-      const nextBounds = deriveBounds(data);
+  const goAnonymous = useCallback(() => {
+    setAuthState("anonymous");
+    setUser(null);
+    setPosts([]);
+    setSelection(null);
+    setActiveTab("overview");
+  }, []);
 
-      setPosts(data);
-      setBounds(nextBounds);
-      // Reset the window to the data's own range so a refresh that widens the
-      // dataset doesn't leave the user staring at a stale, empty period.
-      setFilters(createDefaultFilters(nextBounds));
-      setSelection(null);
-      setLoadState("success");
-    } catch (loadError) {
-      const message = loadError instanceof Error ? loadError.message : "Неизвестная ошибка запроса.";
-      setError(`Backend не ответил на /telegram и /vk. ${message}`);
-      setLoadState("error");
-    } finally {
-      setRefreshing(false);
+  const load = useCallback(
+    async (isRefresh = false) => {
+      try {
+        if (isRefresh) setRefreshing(true);
+        else setLoadState("loading");
+        setError("");
+
+        // Обновление по кнопке заставляет шлюз перечитать данные из backend,
+        // а не отдать закэшированный ответ. Доступно только админу.
+        if (isRefresh && user?.role === "admin") {
+          await refreshData();
+        }
+
+        const data = await fetchPosts();
+        const nextBounds = deriveBounds(data);
+
+        setPosts(data);
+        setBounds(nextBounds);
+        // Возвращаем окно к диапазону самих данных, чтобы после обновления
+        // пользователь не остался в пустом периоде.
+        setFilters(createDefaultFilters(nextBounds));
+        setSelection(null);
+        setLoadState("success");
+      } catch (loadError) {
+        if (loadError instanceof UnauthorizedError) {
+          goAnonymous();
+          return;
+        }
+        const message = loadError instanceof Error ? loadError.message : "Неизвестная ошибка запроса.";
+        setError(message);
+        setLoadState("error");
+      } finally {
+        setRefreshing(false);
+      }
+    },
+    [goAnonymous, user]
+  );
+
+  // Сначала выясняем, есть ли живая сессия, и только потом грузим данные.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function check() {
+      try {
+        const me = await fetchCurrentUser();
+        if (cancelled) return;
+        if (me) {
+          setUser(me);
+          setAuthState("authenticated");
+          setPasswordDialog(me.mustChangePassword);
+        } else {
+          setAuthState("anonymous");
+        }
+      } catch {
+        if (!cancelled) setAuthState("anonymous");
+      }
     }
+
+    void check();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (authState === "authenticated") void load();
+    // load зависит от user.role, но перезагружать данные при смене роли не нужно.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authState]);
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await logoutRequest();
+    } finally {
+      goAnonymous();
+    }
+  }, [goAnonymous]);
 
   const filteredPosts = useMemo(() => filterPosts(posts, filters), [posts, filters]);
 
@@ -135,10 +201,30 @@ export default function App() {
     [select]
   );
 
-  if (loadState === "loading") {
+  const navProps = {
+    active: activeTab,
+    onChange: setActiveTab,
+    user,
+    onLogout: () => void handleLogout(),
+    onChangePassword: () => setPasswordDialog(true),
+  };
+
+  const passwordDialogNode = passwordDialog ? (
+    <ChangePasswordDialog
+      forced={user?.mustChangePassword ?? false}
+      onDone={() => {
+        setPasswordDialog(false);
+        // Смена пароля отзывает остальные сессии; текущую шлюз сохраняет,
+        // но флаг «нужно сменить» надо снять локально.
+        setUser((current) => (current ? { ...current, mustChangePassword: false } : current));
+      }}
+      onCancel={() => setPasswordDialog(false)}
+    />
+  ) : null;
+
+  if (authState === "checking") {
     return (
       <div className="app-shell">
-        <NavBar active={activeTab} onChange={setActiveTab} periodLabel={null} refreshing onRefresh={() => {}} />
         <div className="page">
           <LoadingState />
         </div>
@@ -146,13 +232,38 @@ export default function App() {
     );
   }
 
+  if (authState === "anonymous") {
+    return (
+      <LoginScreen
+        onSuccess={(loggedIn) => {
+          setUser(loggedIn);
+          setPasswordDialog(loggedIn.mustChangePassword);
+          setAuthState("authenticated");
+        }}
+      />
+    );
+  }
+
+  if (loadState === "loading") {
+    return (
+      <div className="app-shell">
+        <NavBar {...navProps} periodLabel={null} refreshing onRefresh={() => {}} />
+        <div className="page">
+          <LoadingState />
+        </div>
+        {passwordDialogNode}
+      </div>
+    );
+  }
+
   if (loadState === "error") {
     return (
       <div className="app-shell">
-        <NavBar active={activeTab} onChange={setActiveTab} periodLabel={null} refreshing={refreshing} onRefresh={() => void load(true)} />
+        <NavBar {...navProps} periodLabel={null} refreshing={refreshing} onRefresh={() => void load(true)} />
         <div className="page">
           <ErrorState message={error} onRetry={() => void load()} />
         </div>
+        {passwordDialogNode}
       </div>
     );
   }
@@ -160,15 +271,25 @@ export default function App() {
   return (
     <div className="app-shell">
       <NavBar
-        active={activeTab}
-        onChange={setActiveTab}
+        {...navProps}
         periodLabel={posts.length > 0 ? periodLabel(bounds) : null}
         refreshing={refreshing}
         onRefresh={() => void load(true)}
       />
 
       <div className="page">
-        {posts.length === 0 ? (
+        {activeTab === "admin" && user?.role === "admin" ? (
+          <motion.div
+            id="panel-admin"
+            role="tabpanel"
+            aria-labelledby="tab-admin"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <AdminPanel currentUsername={user.username} />
+          </motion.div>
+        ) : posts.length === 0 ? (
           <EmptyState
             title="Backend вернул пустой список"
             description="Как только парсеры запишут публикации в базу, метрики и графики появятся здесь автоматически."
@@ -401,6 +522,7 @@ export default function App() {
       </div>
 
       <DrillDownPanel label={selection?.label ?? null} posts={drilldownPosts} onClose={() => setSelection(null)} />
+      {passwordDialogNode}
     </div>
   );
 }

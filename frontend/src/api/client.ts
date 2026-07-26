@@ -1,6 +1,8 @@
 import { ApiPost, Post, PostSource } from "../types/post";
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").trim();
+// Данные идут через шлюз авторизации (/api/...), а не напрямую в backend:
+// backend слушает только localhost и в интернет не публикуется.
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "/api").trim().replace(/\/$/, "");
 
 const ENDPOINTS = {
   telegram: `${API_BASE_URL}/telegram`,
@@ -86,23 +88,35 @@ function normalizePost(raw: ApiPost, index: number): Post {
   };
 }
 
+/** Сессия истекла — App перерисует экран входа вместо ошибки. */
+export class UnauthorizedError extends Error {
+  constructor() {
+    super("Сессия истекла, войдите заново.");
+  }
+}
+
 async function fetchEndpoint(url: string): Promise<ApiPost[]> {
   const response = await fetch(url, {
     headers: {
       Accept: "application/json",
     },
-    // Same-origin API by design: never forward cookies/credentials cross-origin.
-    credentials: "omit",
+    // Шлюз узнаёт пользователя по куке сессии, поэтому её надо отправить.
+    // Запрос всегда same-origin: наружу куки не уходят.
+    credentials: "same-origin",
     referrerPolicy: "no-referrer",
   });
 
+  if (response.status === 401) {
+    throw new UnauthorizedError();
+  }
+
   if (!response.ok) {
-    throw new Error(`API error ${response.status}: ${response.statusText}`);
+    throw new Error(`Шлюз ответил ${response.status}: ${response.statusText}`);
   }
 
   const payload = (await response.json()) as unknown;
   if (!Array.isArray(payload)) {
-    throw new Error("Unexpected API response format");
+    throw new Error("Неожиданный формат ответа API");
   }
 
   return payload as ApiPost[];

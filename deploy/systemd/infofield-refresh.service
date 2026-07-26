@@ -1,0 +1,20 @@
+[Unit]
+Description=InfoField: обновление данных из Telegram и ВКонтакте
+After=infofield-backend.service
+Requires=infofield-backend.service
+
+[Service]
+Type=oneshot
+User=infofield
+Group=infofield
+WorkingDirectory=/opt/infofield
+
+# Дёргаем backend напрямую: запрос запускает парсер и разметку новых
+# публикаций. Шлюз при следующем обращении пользователя увидит свежие данные.
+# Таймаут большой: полный проход по каналу с Gemini идёт долго.
+ExecStart=/usr/bin/curl -sS --max-time 1800 -o /dev/null http://127.0.0.1:8000/telegram
+ExecStart=/usr/bin/curl -sS --max-time 1800 -o /dev/null http://127.0.0.1:8000/vk
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=infofield-refresh
