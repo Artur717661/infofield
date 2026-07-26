@@ -115,8 +115,9 @@ free -h
 ### 2. Ужать PostgreSQL
 
 ```bash
+PGVER=$(ls /etc/postgresql | sort -n | tail -1)
 cp /opt/infofield/deploy/systemd/lowmem/postgresql-lowmem.conf \
-   /etc/postgresql/16/main/conf.d/lowmem.conf
+   /etc/postgresql/$PGVER/main/conf.d/lowmem.conf
 systemctl restart postgresql
 ```
 
@@ -347,25 +348,19 @@ cd infofield && bash deploy/setup-server.sh
 
 ## Проверка, что всё поднялось
 
-На сервере:
+Одной командой на сервере:
 
 ```bash
-systemctl status infofield-backend  --no-pager
-systemctl status infofield-gateway  --no-pager
-systemctl status nginx              --no-pager
+sudo bash /opt/infofield/deploy/verify.sh
 ```
 
-Все три — `active (running)`.
+Скрипт проверит 25 пунктов и по каждому скажет, что не так и какой командой
+починить: запущены ли сервисы, слушают ли backend и шлюз только localhost,
+есть ли данные в базе и администратор, собран ли фронтенд, выпущен ли
+сертификат, закрыты ли данные без входа, отдаются ли заголовки безопасности,
+хватает ли памяти и диска. Ничего не меняет — только смотрит.
 
-С любого компьютера:
-
-```bash
-# данные без входа должны отдавать 401
-curl -s -o /dev/null -w "%{http_code}\n" https://info-field.ru/api/telegram
-
-# http должен перебрасывать на https (301)
-curl -s -o /dev/null -w "%{http_code}\n" http://info-field.ru
-```
+Ожидаемый финал: `Критических проблем нет.`
 
 Оценка настроек снаружи: https://securityheaders.com/?q=info-field.ru
 (ожидаемо A или A+).
